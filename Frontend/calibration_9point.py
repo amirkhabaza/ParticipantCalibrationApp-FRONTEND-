@@ -1,0 +1,78 @@
+"""
+9-point eye-tracker calibration prototype (PsychoPy).
+
+Output: output/calibratio_targets.csv
+"""
+
+from __future__ import annotations
+
+import csv
+import random 
+import sys
+import time
+from pathlib import Path
+
+from psychopy import core, event, visual 
+
+# Project root is one level up from calibration/
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Configuration 
+
+TARGET_DURATION_S = 1.0
+RANDOM_SEED = 42
+PRE_TARGET_BLANK_S = 0.3
+INTER_TARGET_BLANK_S = 0.3
+EDGE_INSET_FRACTION = 0.10
+
+DOT_RADIUS_PX = 4
+CROSSHAIR_ARM_PX = 24
+CROSSHAIR_LINE_WIDTH_PX = 1
+RING_START_RADIUS_PX = 48
+RING_END_RADIUS_PX = DOT_RADIUS_PX + 2
+RING_LINE_WIDTH_PX = 2
+
+TARGET_COLOR = [1, 1, 1]
+BACKGROUND_COLOR = [0, 0, 0]
+
+INSTRUCTIONS_TEXT = (
+    "Please focus your gaze precisely on the center of each dotas it appears.\n\n"
+    "Press the SPACEBAR to begin."
+)
+
+OUTPUT_FILENAME = "calibration_targets.csv"
+CSV_HEADERS = [
+    "Timestamp_Start",
+    "Timestamp_End",
+    "Target_ID",
+    "Target_X_Px",
+    "Target_Y_Px",
+    "Screen_Width",
+    "Screen_Height",
+
+]
+
+def generate_grid_targets(screen_width: int, screen_height: int) -> list[dict]:
+    """Build a 3×3 grid; Target_ID 1–9 in row-major order (top-left → bottom-right)."""
+    inset = EDGE_INSET_FRACTION
+    fractions = [inset, 0.5, 1.0 - inset]
+
+    targets: list[dict] = []
+    target_id = 1
+    for y_frac in fractions:
+        for x_frac in fractions:
+            x_px = int(round(x_frac * screen_width))
+            y_px = int(round(y_frac * screen_height))
+            pos_x = x_px - (screen_width / 2.0)
+            pos_y = (screen_height / 2.0) - y_px
+            targets.append(
+                {
+                    "Target_ID": target_id,
+                    "Target_X_Px": x_px,
+                    "Target_Y_Px": y_px,
+                    "pos": (pos_x, pos_y),
+                }
+            )
+            target_id += 1
+
+    return targets
