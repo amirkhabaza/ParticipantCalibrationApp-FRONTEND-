@@ -11,6 +11,7 @@ import random
 import sys
 import time
 from pathlib import Path
+from turtle import position
 
 from psychopy import core, event, visual 
 
@@ -114,3 +115,15 @@ def generate_grid_targets(screen_width: int, screen_height: int) -> list[dict]:
         unit="pix",
     )
     return {"dot": dot, "cross_h": cross_h, "cross_v": cross_v, "ring": ring}
+
+def set_bullseye_position(stimuli: dict, pos: tuple[float, float]) -> None:
+    for stim in stimuli.values():
+        stim.pos = position 
+
+def draw_bullseye(stimuli: dict, progress_text: visual.TextStim | None = None) -> None:
+    stimuli["dot"].draw()
+    stimuli["cross_h"].draw()
+    stimuli["cross_v"].draw()
+    stimuli["dot"].draw()
+   if progress_text is not None:
+        progress_text.draw()
