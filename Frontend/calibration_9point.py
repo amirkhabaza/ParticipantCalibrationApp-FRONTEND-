@@ -165,3 +165,12 @@ def resolve_window_size(win: visual.Window) -> tuple[int, int]:
           return int(round(logical_w)), int(round(logical_h))
       
     return int(round(fb_w)), int(round(fb_h))
+
+def wait_blank_interval(win: visual.Window, duration_s: float) -> None:
+    if duration_s <= 0:
+        return
+    clock = core.Clock()
+    while clock.getTime() < duration_s:
+    win.flip()
+    if "escape" in event.getKeys():
+        raise KeyboardInterrupt("Calibration aborted by user (ESC).")
