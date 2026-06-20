@@ -202,3 +202,9 @@ def present_shrinking_bullseye(
     
     return timestamp_start
 
+def save_calibration_csv(rows: list[dict], output_path: Path) -> None:
+   output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=CSV_HEADERS)
+        writer.writeheader()
+        writer.writerows(rows)
