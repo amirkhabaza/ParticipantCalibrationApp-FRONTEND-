@@ -12,6 +12,7 @@ from pathlib import Path
 
 from psychopy import core, event, visual
 
+
 # Project root is one level up from Frontend/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -38,6 +39,7 @@ RANDOM_SEED = 42
 PRE_TARGET_BLANK_S = 0.3
 INTER_TARGET_BLANK_S = 0.3
 EDGE_INSET_FRACTION = 0.10
+SHOW_CIRCLES = True  # False = crosshairs only (no center dot or shrinking ring)
 
 DOT_RADIUS_PX = 4
 CROSSHAIR_ARM_PX = 24
@@ -45,6 +47,8 @@ CROSSHAIR_LINE_WIDTH_PX = 1
 RING_START_RADIUS_PX = 48
 RING_END_RADIUS_PX = DOT_RADIUS_PX + 2
 RING_LINE_WIDTH_PX = 2
+SHOW_CIRCLES = False  # crosshairs only
+
 
 TARGET_COLOR = [1, 1, 1]
 BACKGROUND_COLOR = [0, 0, 0]
@@ -136,11 +140,24 @@ def set_bullseye_position(stimuli: dict, position: tuple[float, float]) -> None:
         stim.pos = position
 
 
-def draw_bullseye(stimuli: dict, progress_text: visual.TextStim | None = None) -> None:
-    stimuli["ring"].draw()
+def circles_enabled() -> bool:
+    if "--no-circles" in sys.argv:
+        return False
+    return SHOW_CIRCLES
+
+
+def draw_bullseye(
+    stimuli: dict,
+    progress_text: visual.TextStim | None = None,
+    *,
+    show_circles: bool = True,
+) -> None:
+    if show_circles:
+        stimuli["ring"].draw()
     stimuli["cross_h"].draw()
     stimuli["cross_v"].draw()
-    stimuli["dot"].draw()
+    if show_circles:
+        stimuli["dot"].draw()
     if progress_text is not None:
         progress_text.draw()
 
@@ -216,20 +233,24 @@ def present_shrinking_bullseye(
     target: dict,
     progress_text: visual.TextStim,
     duration_s: float = TARGET_DURATION_S,
+    *,
+    show_circles: bool = True,
 ) -> float:
     ring = stimuli["ring"]
     set_bullseye_position(stimuli, target["pos"])
-    ring.radius = RING_START_RADIUS_PX
+    if show_circles:
+        ring.radius = RING_START_RADIUS_PX
 
     clock = core.Clock()
     timestamp_start = time.time()
 
     while clock.getTime() < duration_s:
-        progress = min(clock.getTime() / duration_s, 1.0)
-        ring.radius = RING_START_RADIUS_PX + (
-            RING_END_RADIUS_PX - RING_START_RADIUS_PX
-        ) * progress
-        draw_bullseye(stimuli, progress_text)
+        if show_circles:
+            progress = min(clock.getTime() / duration_s, 1.0)
+            ring.radius = RING_START_RADIUS_PX + (
+                RING_END_RADIUS_PX - RING_START_RADIUS_PX
+            ) * progress
+        draw_bullseye(stimuli, progress_text, show_circles=show_circles)
         win.flip()
         if "escape" in event.getKeys():
             raise KeyboardInterrupt("Calibration aborted by user (ESC).")
@@ -274,6 +295,8 @@ def run_calibration() -> Path:
         )
 
         auto_mode = "--auto" in sys.argv
+        show_circles = circles_enabled()
+        print(f"Show circles: {show_circles}")
         if auto_mode:
             print("Auto mode: skipping instructions and exit prompt.")
             event.clearEvents(eventType="keyboard")
@@ -296,7 +319,7 @@ def run_calibration() -> Path:
         for index, target in enumerate(presentation_order):
             progress_text.text = f"Calibration point {index + 1} of {total_targets}"
             timestamp_start = present_shrinking_bullseye(
-                win, bullseye, target, progress_text
+                win, bullseye, target, progress_text, show_circles=show_circles
             )
             win.flip()
             timestamp_end = time.time()
