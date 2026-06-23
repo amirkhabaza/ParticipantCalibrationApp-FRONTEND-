@@ -34,22 +34,22 @@ def enable_windows_dpi_awareness() -> None:
 
 # Configuration
 
-TARGET_DURATION_S = 1.0
+TARGET_DURATION_S = 1.5  # seconds each target stays on screen (was 1.0)
 RANDOM_SEED = 42
 PRE_TARGET_BLANK_S = 0.3
-INTER_TARGET_BLANK_S = 0.3
+INTER_TARGET_BLANK_S = 0.5  # blank between targets — time to find the next one
 EDGE_INSET_FRACTION = 0.10
 SHOW_CIRCLES = False  # False = crosshairs only (no center dot or shrinking ring)
 
-DOT_RADIUS_PX = 4
-CROSSHAIR_ARM_PX = 24
-CROSSHAIR_LINE_WIDTH_PX = 1
+DOT_RADIUS_PX = 5
+CROSSHAIR_ARM_PX = 32
+CROSSHAIR_LINE_WIDTH_PX = 3  # thicker lines improve visibility on Retina/high-DPI
 RING_START_RADIUS_PX = 48
 RING_END_RADIUS_PX = DOT_RADIUS_PX + 2
 RING_LINE_WIDTH_PX = 2
 
-TARGET_COLOR = [1, 1, 1]
-BACKGROUND_COLOR = [0, 0, 0]
+TARGET_COLOR = [1, 1, 1]       # white (PsychoPy rgb: -1..1)
+BACKGROUND_COLOR = [-1, -1, -1]  # black — [0,0,0] in rgb is mid-grey
 
 INSTRUCTIONS_TEXT = (
     "Please focus your gaze precisely on the center of each dot as it appears.\n\n"

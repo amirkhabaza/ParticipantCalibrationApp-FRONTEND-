@@ -192,12 +192,15 @@ Edit constants at the top of `calibration_9point.py`:
 
 | Constant | Default | Meaning |
 |----------|---------|---------|
-| `TARGET_DURATION_S` | `1.0` | Seconds each target is shown |
+| `TARGET_DURATION_S` | `1.5` | Seconds each target is shown |
 | `RANDOM_SEED` | `42` | Shuffle seed (deterministic order) |
 | `PRE_TARGET_BLANK_S` | `0.3` | Blank before first target |
-| `INTER_TARGET_BLANK_S` | `0.3` | Blank between targets |
+| `INTER_TARGET_BLANK_S` | `0.5` | Blank between targets (time to locate next point) |
 | `EDGE_INSET_FRACTION` | `0.10` | Grid inset from edges |
 | `SHOW_CIRCLES` | `False` | `True` = dot + shrinking ring |
+| `CROSSHAIR_ARM_PX` | `32` | Half-length of each crosshair arm |
+| `CROSSHAIR_LINE_WIDTH_PX` | `3` | Crosshair stroke width (visibility on Retina) |
+| `TARGET_COLOR` / `BACKGROUND_COLOR` | `[1,1,1]` / `[-1,-1,-1]` | White on black in PsychoPy `rgb` space (−1..1, not 0..1) |
 
 ### CLI flags
 
