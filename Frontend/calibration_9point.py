@@ -95,18 +95,32 @@ def build_output_filename() -> str:
 
 
 def generate_grid_targets(screen_width: int, screen_height: int) -> list[dict]:
-    """Build a 3×3 grid; Target_ID 1–9 in row-major order (top-left → bottom-right)."""
+    """Build a 3×3 grid with equal pixel spacing on both axes (Target_ID 1–9, row-major)."""
     inset = EDGE_INSET_FRACTION
-    fractions = [inset, 0.5, 1.0 - inset]
+    center_x = screen_width / 2.0
+    center_y = screen_height / 2.0
+
+    # Spacing between adjacent dots, derived from vertical edge inset (EDGE_INSET_FRACTION).
+    step = center_y - (inset * screen_height)
+    step = min(step, center_x, screen_width - center_x)
+
+    x_px_values = [
+        int(round(center_x - step)),
+        int(round(center_x)),
+        int(round(center_x + step)),
+    ]
+    y_px_values = [
+        int(round(center_y - step)),
+        int(round(center_y)),
+        int(round(center_y + step)),
+    ]
 
     targets: list[dict] = []
     target_id = 1
-    for y_frac in fractions:
-        for x_frac in fractions:
-            x_px = int(round(x_frac * screen_width))
-            y_px = int(round(y_frac * screen_height))
-            pos_x = x_px - (screen_width / 2.0)
-            pos_y = (screen_height / 2.0) - y_px
+    for y_px in y_px_values:
+        for x_px in x_px_values:
+            pos_x = x_px - center_x
+            pos_y = center_y - y_px
             targets.append(
                 {
                     "Target_ID": target_id,
