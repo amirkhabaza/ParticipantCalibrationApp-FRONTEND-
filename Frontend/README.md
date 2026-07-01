@@ -1,4 +1,4 @@
-# Participant Calibration App
+# Participant Calibration App — Frontend
 
 PsychoPy app that runs a **9-point eye-tracker calibration** on the participant monitor. It shows fixation targets and logs **when** (VSYNC-aligned, Unix timestamps) and **where** each target appeared. Gaze is recorded separately by the eye tracker; this repo handles only the **stimulus + ground-truth log** side.
 
@@ -11,8 +11,8 @@ Built for NASA internship eye-tracking research.
 **Prerequisites:** Python **3.10**, a monitor with OpenGL (standard on Mac / Windows laptops).
 
 ```bash
-git clone https://github.com/amirkhabaza/ParticipantCalibrationApp-FRONTEND-.git
-cd ParticipantCalibrationApp-FRONTEND-/Frontend
+git clone https://github.com/amirkhabaza/ParticipantCalibrationApp-FRONTEND.git
+cd ParticipantCalibrationApp-FRONTEND/Frontend
 chmod +x run.sh          # macOS / Linux, first time only
 ./run.sh                 # creates .venv, installs deps, runs calibration
 ```
@@ -24,7 +24,7 @@ cd Frontend
 .\run.ps1
 ```
 
-**Smoke test without a participant** (skips instructions and exit prompt):
+**Smoke test without a participant** (skips instructions and exit prompt; auto-confirms each dim target after 0.3 s):
 
 ```bash
 ./run.sh --auto
@@ -59,6 +59,8 @@ Eye-tracker calibration needs two synchronized streams:
 
 This app does **not** talk to the eye tracker. It fullscreen-opens on the stimulus monitor, presents nine known screen positions in shuffled order, and writes a CSV with VSYNC-aligned **Unix epoch** timestamps so downstream analysis can match gaze samples to each target window.
 
+Each target uses a **dim → confirm → bright** flow: the participant looks at a dim dot, confirms readiness (joystick button by default), then the dot turns bright for a fixed recording window. The CSV logs separate timestamps for the dim and bright phases.
+
 ---
 
 ## Where it fits in the pipeline
@@ -82,18 +84,19 @@ This app does **not** talk to the eye tracker. It fullscreen-opens on the stimul
           └──────────────────────┘
 ```
 
-**Typical session:** start eye-tracker recording → run this app on the same monitor → stop recording → align the session’s `calibration_targets_*.csv` with gaze export by timestamp.
+**Typical session:** start eye-tracker recording → run this app on the same monitor → stop recording → align the session's `calibration_targets_*.csv` with gaze export by timestamp. Use the **bright** timestamps as the primary gaze-recording window.
 
 ---
 
 ## Repo layout
 
 ```
-ParticipantCalibrationApp-FRONTEND-/
-├── Backend/                     ← Calibration model (separate workstream)
+ParticipantCalibrationApp-FRONTEND/
+├── README.md                    ← Overview + quick start
+├── Backend/                     ← Calibration model (separate workstream; placeholder)
 └── Frontend/
-    ├── README.md                ← Start here
-    ├── calibration_9point.py    ← Main application (~400 lines, single file)
+    ├── README.md                ← Start here (this file)
+    ├── calibration_9point.py    ← Main application (~700 lines, single file)
     ├── requirements.txt         ← PsychoPy dependency
     ├── run.sh                   ← macOS/Linux: setup + run
     ├── run.ps1                  ← Windows: setup + run
@@ -103,7 +106,7 @@ ParticipantCalibrationApp-FRONTEND-/
 
 | File | Purpose |
 |------|---------|
-| `calibration_9point.py` | Fullscreen stimulus, VSYNC timing, CSV export |
+| `calibration_9point.py` | Fullscreen stimulus, dim/bright gating, VSYNC timing, CSV export |
 | `requirements.txt` | `psychopy>=2024.1.4,<2027.0.0` (Python 3.8–3.10) |
 | `run.sh` / `run.ps1` | Create venv, install deps, run script |
 
@@ -114,27 +117,33 @@ Always run from `Frontend/` (or use the run scripts, which `cd` there for you).
 ## Session flow
 
 ```
-[Instructions]  "Focus on each dot… Press SPACEBAR to begin"
-       │ SPACEBAR
+[Instructions]  "A dim dot will appear… confirm when ready… bright for 2 s"
+       │ confirm (joystick button or SPACEBAR with --keyboard)
        ▼
 [0.3 s blank]
        ▼
-[Target 1 of 9]  center dot + crosshairs (optional shrinking ring) for 1.5 s
+For each of 9 targets (shuffled order):
+  [Dim dot + prompt]  participant confirms when fixated
        ▼
-[0.5 s blank]  →  repeat for all 9 targets
+  [Bright dot]  center dot + crosshairs (optional shrinking ring) for 2.0 s
+       ▼
+  [0.5 s blank]  →  next target
        ▼
 [Calibration complete — press any key to exit]
 ```
 
-| Key | Action |
-|-----|--------|
-| **SPACEBAR** | Start (instructions screen only) |
+| Input | Action |
+|-------|--------|
+| **Joystick button** (default) | Confirm dim target / start session |
+| **SPACEBAR** | Confirm when `--keyboard` is set (or fallback if no joystick) |
 | **ESC** | Abort — completed targets are still saved |
 | **Any key** | Exit after completion |
 
+By default the app uses the first connected joystick (`button 0`). Pass `--keyboard` to use SPACEBAR instead.
+
 ### 9-point grid
 
-Targets sit on a 3×3 grid at **30%, 50%, 70%** of width and height (`EDGE_INSET_FRACTION = 0.30`). IDs are fixed by position (row-major, top-left = 1):
+Targets sit on a 3×3 grid with equal pixel spacing derived from `EDGE_INSET_FRACTION` (default **30%** inset from vertical edges). IDs are fixed by position (row-major, top-left = 1):
 
 ```
 ┌─────┬─────┬─────┐
@@ -143,7 +152,7 @@ Targets sit on a 3×3 grid at **30%, 50%, 70%** of width and height (`EDGE_INSET
 │  4  │  5  │  6  │
 ├─────┼─────┼─────┤
 │  7  │  8  │  9  │
-└─────┴─────┴─────┘
+└─────┴─────────────┘
 ```
 
 **Presentation order** is shuffled each run by default (`RANDOM_SEED = None`). Set `RANDOM_SEED` to an integer (e.g. `42`) for a repeatable order. The CSV `Target_ID` is grid position, not show order.
@@ -152,7 +161,7 @@ Targets sit on a 3×3 grid at **30%, 50%, 70%** of width and height (`EDGE_INSET
 
 By default (`SHOW_CIRCLES = False`): **center dot + crosshairs** on a black background — no shrinking ring.
 
-Optional bullseye mode (`SHOW_CIRCLES = True`) adds a shrinking ring around the dot.
+Optional bullseye mode (`SHOW_CIRCLES = True`) adds a shrinking ring around the dot during the bright phase.
 
 ```bash
 python calibration_9point.py --no-circles   # force crosshairs + dot only (no ring)
@@ -178,8 +187,10 @@ Example: `calibration_targets_2026-06-29T18-23-16-287Z.csv`
 
 | Column | Description |
 |--------|-------------|
-| `Timestamp_Start` | Unix seconds (VSYNC) when target first appeared |
-| `Timestamp_End` | Unix seconds (VSYNC) when target was replaced by blank |
+| `Dim_Timestamp_Start` | Unix seconds (VSYNC) when dim target first appeared |
+| `Dim_Timestamp_End` | Unix seconds (VSYNC) when dim target ended (on confirm) |
+| `Bright_Timestamp_Start` | Unix seconds (VSYNC) when bright target first appeared |
+| `Bright_Timestamp_End` | Unix seconds (VSYNC) when bright target was replaced by blank |
 | `Target_ID` | Grid ID 1–9 |
 | `Target_X_Px` | Horizontal pixel (top-left origin) |
 | `Target_Y_Px` | Vertical pixel (top-left origin) |
@@ -189,11 +200,11 @@ Example: `calibration_targets_2026-06-29T18-23-16-287Z.csv`
 Example:
 
 ```csv
-Timestamp_Start,    Timestamp_End,      Target_ID,  Target_X_Px,  Target_Y_Px,  Screen_Width,     Screen_Height
-1719154322.747760,  1719154323.756066,  4,          151,          491,          1512,             982
+Dim_Timestamp_Start,Dim_Timestamp_End,Bright_Timestamp_Start,Bright_Timestamp_End,Target_ID,Target_X_Px,Target_Y_Px,Screen_Width,Screen_Height
+1719154320.123456,1719154321.456789,1719154321.500000,1719154323.500000,4,151,491,1512,982
 ```
 
-Use `Timestamp_Start` / `Timestamp_End` to select gaze samples during each target window.
+Use `Bright_Timestamp_Start` / `Bright_Timestamp_End` to select gaze samples during the confirmed recording window. The dim timestamps mark when the participant was cued but before they confirmed fixation.
 
 ### VSYNC timing
 
@@ -209,18 +220,21 @@ Edit constants at the top of `calibration_9point.py`:
 
 | Constant | Default | Meaning |
 |----------|---------|---------|
-| `TARGET_DURATION_S` | `1.5` | Seconds each target is shown |
+| `BRIGHT_DURATION_S` | `2.0` | Seconds the bright target stays on after confirmation |
+| `AUTO_DIM_WAIT_S` | `0.3` | In `--auto` mode, seconds before auto-confirming each dim target |
 | `RANDOM_SEED` | `None` | Shuffle seed; `None` = new random order each run |
 | `PRE_TARGET_BLANK_S` | `0.3` | Blank before first target |
 | `INTER_TARGET_BLANK_S` | `0.5` | Blank between targets (time to locate next point) |
-| `EDGE_INSET_FRACTION` | `0.30` | Grid inset from edges |
+| `EDGE_INSET_FRACTION` | `0.30` | Grid inset from edges (equal spacing on both axes) |
 | `SCREEN_INDEX` | `0` | Default monitor index (0 = primary, 1 = secondary) |
-| `SHOW_CIRCLES` | `False` | `True` = add shrinking ring around dot |
+| `SHOW_CIRCLES` | `False` | `True` = add shrinking ring around dot during bright phase |
 | `DOT_RADIUS_PX` | `15` | Center dot radius |
 | `CROSSHAIR_ARM_PX` | `32` | Half-length of each crosshair arm |
 | `CROSSHAIR_LINE_WIDTH_PX` | `3` | Crosshair stroke width (visibility on Retina) |
+| `JOYSTICK_INDEX` | `0` | Default joystick device index |
+| `JOYSTICK_CONFIRM_BUTTON` | `0` | Button index for confirm (0 = typical trigger) |
 | `OUTPUT_BASENAME` | `calibration_targets` | Filename prefix before UTC timestamp |
-| `TARGET_COLOR` / `BACKGROUND_COLOR` | `[1,1,1]` / `[0,0,0]` | White targets on black (`rgb` color space, −1…1) |
+| `TARGET_COLOR` / `DIM_COLOR` / `BACKGROUND_COLOR` | `[1,1,1]` / `[0.25,0.25,0.25]` / `[-1,-1,-1]` | Bright white / dim grey / black (`rgb` color space, −1…1) |
 
 Filename format is built by `build_output_filename()` from `OUTPUT_BASENAME` plus UTC date-time to the millisecond.
 
@@ -237,16 +251,34 @@ Resolution order (first match wins):
 CALIBRATION_SCREEN=1 ./run.sh
 ```
 
+### Joystick selection
+
+Resolution order (first match wins):
+
+1. CLI: `--joystick 0`, `--joystick-index 0`, `--joystick-button 0`
+2. Environment: `CALIBRATION_JOYSTICK` / `JOYSTICK_INDEX`, `CALIBRATION_JOYSTICK_BUTTON` / `JOYSTICK_BUTTON`
+3. Config: `JOYSTICK_INDEX`, `JOYSTICK_CONFIRM_BUTTON`
+
+```bash
+./run.sh --joystick 0 --joystick-button 0
+CALIBRATION_JOYSTICK=0 ./run.sh
+```
+
+If no joystick is found, the app falls back to SPACEBAR automatically. Pass `--keyboard` to force keyboard input.
+
 ### CLI flags
 
 | Flag | Effect |
 |------|--------|
-| `--auto` | Skip instructions and exit prompt (testing / CI) |
+| `--auto` | Skip instructions and exit prompt; auto-confirm dim targets after `AUTO_DIM_WAIT_S` |
+| `--keyboard` | Use SPACEBAR for confirm instead of joystick |
 | `--no-circles` | Dot + crosshairs only (no shrinking ring) |
 | `--screen <index>` | Monitor to display on (e.g. `1` for secondary display) |
+| `--joystick <index>` | Joystick device index (alias: `--joystick-index`) |
+| `--joystick-button <index>` | Joystick button for confirm |
 
 ```bash
-python calibration_9point.py --auto --no-circles --screen 1
+python calibration_9point.py --auto --keyboard --no-circles --screen 1
 ```
 
 ---
@@ -291,26 +323,29 @@ python calibration_9point.py
 
 Single-file design. Entry: `main()` → `run_calibration()`.
 
-| Function | Role |
-|----------|------|
+| Function / class | Role |
+|------------------|------|
 | `enable_windows_dpi_awareness()` | Physical pixels on scaled Windows displays |
 | `create_calibration_window()` | Fullscreen PsychoPy window on chosen monitor |
 | `get_screen_index()` | Resolve monitor from CLI, env, or config |
 | `resolve_window_size()` | Correct pixel dimensions (Retina / DPI) |
-| `generate_grid_targets()` | 9 positions from screen size |
+| `generate_grid_targets()` | 9 equidistant positions from screen size |
 | `build_bullseye_stimuli()` | Dot, crosshairs, ring |
-| `present_shrinking_bullseye()` | Show one target; return Unix VSYNC start/end |
+| `ConfirmDevice` | Joystick or keyboard confirm input per frame |
+| `create_confirm_device()` | Open joystick (or fall back to keyboard) |
+| `wait_for_target_confirm()` | Dim phase until participant confirms |
+| `present_shrinking_bullseye()` | Dim + bright phases; return four VSYNC timestamps |
 | `unix_epoch_offset()` / `flip_to_unix_time()` | Map PsychoPy clock → Unix epoch |
 | `build_output_filename()` | UTC timestamped CSV name for this session |
 | `save_calibration_csv()` | Write `output/calibration_targets_<UTC-timestamp>.csv` |
-| `wait_for_spacebar()` / `wait_blank_interval()` | Participant pacing + ESC abort |
+| `wait_for_confirm()` / `wait_blank_interval()` | Participant pacing + ESC abort |
 
 **Data flow:**
 
 ```
 resolve_window_size → generate_grid_targets → shuffle
-    → for each target: present_shrinking_bullseye (flip loop)
-    → append row → save_calibration_csv
+    → for each target: dim (confirm) → bright (fixed duration)
+    → append row with dim + bright timestamps → save_calibration_csv
 ```
 
 ---
@@ -324,4 +359,4 @@ resolve_window_size → generate_grid_targets → shuffle
 
 ## License / repo
 
-[ParticipantCalibrationApp-FRONTEND-](https://github.com/amirkhabaza/ParticipantCalibrationApp-FRONTEND-) on GitHub.
+[ParticipantCalibrationApp-FRONTEND](https://github.com/amirkhabaza/ParticipantCalibrationApp-FRONTEND) on GitHub.
