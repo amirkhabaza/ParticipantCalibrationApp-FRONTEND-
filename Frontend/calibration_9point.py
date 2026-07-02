@@ -64,8 +64,14 @@ TEXT_WRAP_FRACTION = 0.75
 PROMPT_COLOR = [0.7, 0.7, 0.7]
 
 
+def build_confirm_prompt(use_joystick: bool) -> str:
+    if use_joystick:
+        return "Press the joystick button or SPACEBAR"
+    return "Press SPACEBAR"
+
+
 def build_instructions_text(use_joystick: bool) -> str:
-    confirm = "Press the joystick button" if use_joystick else "Press SPACEBAR"
+    confirm = build_confirm_prompt(use_joystick)
     return (
         "Eye-tracker calibration\n\n"
         "1. A dim dot will appear.\n"
@@ -77,9 +83,7 @@ def build_instructions_text(use_joystick: bool) -> str:
 
 
 def build_dim_prompt_text(use_joystick: bool) -> str:
-    if use_joystick:
-        return "Look at the dot, then press the joystick button"
-    return "Look at the dot, then press SPACEBAR"
+    return f"Look at the dot, then {build_confirm_prompt(use_joystick).lower()}"
 
 OUTPUT_BASENAME = "calibration_targets"
 CSV_HEADERS = [
@@ -266,7 +270,7 @@ class ConfirmDevice:
     @property
     def label(self) -> str:
         if self.use_joystick:
-            return f"joystick button {self.button_id}"
+            return f"joystick button {self.button_id} or SPACEBAR"
         return "SPACEBAR"
 
     def sync_button_state(self) -> None:
@@ -282,15 +286,16 @@ class ConfirmDevice:
 
     def poll(self) -> tuple[list[str], bool]:
         """Poll ESC and confirm input once per frame."""
-        if self.use_joystick and self.joystick is not None:
-            keys = poll_keys("escape")
-            pressed = bool(self.joystick.getButton(self.button_id))
-            confirmed = pressed and not self._button_was_down
-            self._button_was_down = pressed
-            return keys, confirmed
-
         keys = poll_keys("escape", TARGET_CONFIRM_KEY)
-        return keys, confirm_key_pressed(keys)
+        keyboard_confirmed = confirm_key_pressed(keys)
+
+        if self.use_joystick and self.joystick is not None:
+            pressed = bool(self.joystick.getButton(self.button_id))
+            joystick_confirmed = pressed and not self._button_was_down
+            self._button_was_down = pressed
+            return keys, joystick_confirmed or keyboard_confirmed
+
+        return keys, keyboard_confirmed
 
 
 def draw_bullseye(
@@ -395,8 +400,20 @@ def create_confirm_device() -> ConfirmDevice:
 
     from psychopy.hardware import joystick
 
+    num_joysticks = joystick.getNumJoysticks()
+    if num_joysticks == 0:
+        print("No joystick connected. Using SPACEBAR for confirm.")
+        return ConfirmDevice(use_joystick=False)
+
     index = get_joystick_index()
     button_id = get_joystick_button()
+    if index < 0 or index >= num_joysticks:
+        print(
+            f"Warning: joystick index {index} is not available "
+            f"({num_joysticks} device(s) connected). Falling back to SPACEBAR."
+        )
+        return ConfirmDevice(use_joystick=False)
+
     try:
         joy = joystick.Joystick(index)
         name = getattr(joy, "name", None) or f"joystick {index}"
@@ -405,7 +422,10 @@ def create_confirm_device() -> ConfirmDevice:
             raise ValueError(
                 f"Button {button_id} out of range; joystick has {num_buttons} button(s) (0–{num_buttons - 1})"
             )
-        print(f"Confirm input: {name}, button {button_id} ({num_buttons} button(s) total)")
+        print(
+            f"Confirm input: {name}, button {button_id} "
+            f"({num_buttons} button(s) total); SPACEBAR accepted as secondary"
+        )
         return ConfirmDevice(use_joystick=True, joystick=joy, button_id=button_id)
     except Exception as exc:
         print(f"Warning: could not open joystick {index} ({exc}). Falling back to SPACEBAR.")
@@ -572,7 +592,7 @@ def save_calibration_csv(rows: list[dict], output_path: Path) -> None:
 
 
 def run_calibration() -> Path:
-    output_path = FRONTEND_DIR / "output" / build_output_filename()
+    output_path = FRONTEND_DIR / "calibration output" / build_output_filename()
 
     enable_windows_dpi_awareness()
     print(f"Platform: {sys.platform}")
